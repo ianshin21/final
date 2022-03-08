@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.petcab.work.user.model.dao.MemberDao">
+	
+	<!-- 중복되는 쿼리문 작성 -->
+	<sql id="selectMemberSql">
+		SELECT USER_NO,
+			   USER_NAME,
+			   USER_ID,
+			   USER_PWD,
+			   POSTCODE,
+			   ADDRESS,
+			   PHONE,
+			   ENROLL_DATE,
+			   MODIFY_DATE,
+			   STATUS,
+			   USER_TYPE
+		FROM MEMBER
+		WHERE STATUS = 'Y'
+	</sql>
+	
+	<resultMap type="Member" id="memberResultMap">
+	
+		<id property="userNo" column="USER_NO"/>
+		
+		<result property="userName" column="USER_NAME"/>
+		<result property="userId" column="USER_ID"/>
+		<result property="userPwd" column="USER_PWD"/>
+		<result property="postCode" column="POSTCODE"/>
+		<result property="address" column="ADDRESS"/>
+		<result property="phone" column="PHONE"/>
+		<result property="enrollDate" column="ENROLL_DATE"/>
+		<result property="modifyDate" column="MODIFY_DATE"/>
+		<result property="status" column="STATUS"/>
+		<result property="userType" column="USER_TYPE"/>
+		<result property="rowNum" column="ROWNUM"/>
+		<association property="dog" resultMap="DogResultMap"/>	
+	</resultMap>
+	
+	<resultMap type="Dog" id="DogResultMap">
+		<id property="dogNo" column="DOG_NO"/>
+		
+		<result property="dogName" column="DOG_NAME"/>
+		<result property="userId" column="USER_ID"/>
+	</resultMap>
+
+	<select id="selectCount" resultType="_int">
+		SELECT COUNT(*) FROM MEMBER
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="keyword != null and keyword != ''">
+				<if test="searchType == 'userId'">
+					AND USER_ID LIKE '%'||#{keyword}||'%'
+				</if>
+				<if test="searchType == 'userName'">
+					AND USER_NAME LIKE '%'||#{keyword}||'%'
+				</if>
+			</if>
+		</trim>
+	</select>
+	
+	<select id="selectMemberAll" resultMap="memberResultMap">
+		<include refid="selectMemberSql"></include>
+	</select>
+	
+	<select id="selectMember" parameterType="string" resultMap="memberResultMap">
+		<include refid="selectMemberSql"></include>
+		AND USER_ID = #{id}
+	</select>
+	
+	<insert id="insertMember" parameterType="Member"
+		useGeneratedKeys="true" keyProperty="userNo" keyColumn="USER_NO">
+		 INSERT INTO MEMBER (
+		 	 USER_NO,
+		 	 USER_NAME,
+		 	 USER_ID,
+			 USER_PWD,
+			 POSTCODE,
+			 ADDRESS,
+			 PHONE,
+			 ENROLL_DATE,
+			 MODIFY_DATE,
+			 STATUS,
+			 USER_TYPE
+		 )
+		 VALUES(
+		     SEQ_USER_NO.NEXTVAL,
+		     #{userName},
+		     #{userId},
+		     #{userPwd},
+		     #{postCode},
+		     #{address},
+		     #{phone}, 
+		     SYSDATE,
+		     SYSDATE,		      	
+		     DEFAULT,
+		     DEFAULT
+		 )
+	</insert>
+	
+	<update id="updateMember" parameterType="Member">
+		UPDATE MEMBER
+		SET
+			PHONE = #{phone},
+			ADDRESS = #{address},
+			MODIFY_DATE = SYSDATE
+		WHERE
+			USER_NO = #{userNo}		
+	</update>
+	
+	<delete id="deleteMember" parameterType="string">
+		UPDATE MEMBER
+		SET
+			STATUS = 'N'
+		WHERE
+			USER_ID = #{id}
+	</delete>
+	
+	<select id="searchMember" parameterType="string" resultMap="memberResultMap">
+		<include refid="selectMemberSql"></include>
+		AND USER_NAME = #{userName}
+		AND PHONE = #{phone}
+	</select>
+
+	<select id="searchMemberPwd" parameterType="string" resultMap="memberResultMap">
+		<include refid="selectMemberSql"></include>
+		AND USER_ID = #{userId}
+		AND PHONE = #{phone}
+	</select>
+	
+	<update id="updatePwd" parameterType="Member">
+		UPDATE MEMBER
+		SET USER_PWD = #{userPwd}
+		WHERE USER_ID = #{userId}
+	</update>
+	
+	<select id="save" resultType="string">
+			SELECT M.USER_ID,D.USER_ID,D.ANIMAL_NO
+			FROM MEMBER M , DOG D
+			WHERE M.USER_ID = D.USER_ID;
+	</select>
+	
+	<select id="selectPartnerAddr" resultType="string">
+		SELECT M.ADDRESS
+		FROM PARTNER P , MEMBER M
+		WHERE P.USER_NO = M.USER_NO AND P.STATUS = 'Y'
+	</select>
+	
+	<select id="rNumSelectMemberAll" resultMap="memberResultMap">
+		SELECT ROWNUM,
+		       USER_NO,
+		       USER_TYPE,
+		       USER_ID,
+		       USER_NAME,
+		       PHONE,
+		       DOG_NAME,
+		       STATUS
+		FROM 
+		     (
+		        SELECT M.USER_NO,
+		               M.USER_TYPE,
+		               M.USER_ID,
+		               M.USER_NAME,
+		               M.PHONE,
+                       DOG_NAME,
+		               M.STATUS
+				FROM MEMBER M
+                LEFT OUTER JOIN
+                ( 
+                    SELECT M.USER_ID, SUBSTR(
+                            XMLAGG(
+                                        XMLELEMENT(COL, ',', DOG_NAME) 
+                                        ORDER BY DOG_NAME
+                                  ).EXTRACT('//text()').GETSTRINGVAL(), 2) DOG_NAME
+                    FROM MEMBER M
+                    LEFT OUTER JOIN DOG D ON M.USER_ID = D.USER_ID
+                    GROUP BY M.USER_ID
+                ) M2
+                ON (M.USER_ID = M2.USER_ID) ORDER BY M.USER_NO
+		      )
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="searchType == 'userId' and keyword != null and keyword != ''">
+				AND USER_ID LIKE '%'||#{keyword}||'%'
+			</if>
+			<if test="searchType == 'userName' and keyword != null and keyword != ''">
+				AND USER_NAME LIKE '%'||#{keyword}||'%'
+			</if>
+		</trim>
+		ORDER BY ROWNUM
+	</select>
+	
+	<select id="selectAllUsers" resultMap="memberResultMap">
+		SELECT ROWNUM,
+       		   USER_NO,
+               USER_TYPE,
+       	  	   USER_ID,
+       		   USER_NAME,
+       		   PHONE,
+       		   DOG_NAME,
+       		   STATUS
+		FROM 
+			(
+			    SELECT M.USER_NO,
+		               M.USER_TYPE,
+		               M.USER_ID,
+		               M.USER_NAME,
+		               M.PHONE,
+		               D.DOG_NAME,
+		               M.STATUS
+			    FROM MEMBER M
+			    JOIN DOG D ON (M.USER_ID = D.USER_ID)
+			    WHERE USER_TYPE = 'ROLE_MEMBER'
+			)
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="searchType == 'userId' and keyword != null and keyword != ''">
+				AND USER_ID LIKE '%'||#{keyword}||'%'
+			</if>
+			<if test="searchType == 'userName' and keyword != null and keyword != ''">
+				AND USER_NAME LIKE '%'||#{keyword}||'%'
+			</if>
+		</trim>
+		ORDER BY ROWNUM
+	</select>
+	
+	<select id="selectUserCount" resultType="_int">
+		SELECT COUNT(*) 
+		FROM MEMBER
+		WHERE USER_TYPE = 'ROLE_MEMBER'
+		<trim prefix="AND" prefixOverrides="AND">
+			<if test="keyword != null and keyword != ''">
+				<if test="searchType == 'userId'">
+					USER_ID LIKE '%'||#{keyword}||'%'
+				</if>
+				<if test="searchType == 'userName'">
+					USER_NAME LIKE '%'||#{keyword}||'%'
+				</if>
+			</if>
+		</trim>
+	</select>
+	
+	<update id="applyDriver" parameterType="Member">
+		UPDATE MEMBER
+		SET USER_TYPE = 'ROLE_DRIVER'
+		WHERE USER_NO = #{userNo}
+	</update>
+	
+	<update id="applyPartner" parameterType="Member">
+		UPDATE MEMBER
+		SET USER_TYPE = 'ROLE_PARTNER'
+		WHERE USER_NO = #{userNo}
+	</update>
+	
+	<update id="updateMInfo" parameterType="Member">
+		UPDATE MEMBER
+		SET PHONE = #{phone},
+			ADDRESS = #{address},
+			POSTCODE = #{postCode},
+			MODIFY_DATE = SYSDATE
+		WHERE USER_ID = #{userId}
+	</update>
+	
+	<select id="kakaoCheck" resultType="int">
+		SELECT COUNT(*) 
+		FROM MEMBER
+		WHERE USER_ID = #{email}
+	</select>
+	
+	<insert id="kakaoInsert" 
+		useGeneratedKeys="true" keyProperty="userNo" keyColumn="USER_NO">
+		 INSERT INTO MEMBER (
+		 	 USER_NO,
+		 	 USER_NAME,
+		 	 USER_ID,
+			 USER_PWD,
+			 POSTCODE,
+			 ADDRESS,
+			 PHONE,
+			 ENROLL_DATE,
+			 MODIFY_DATE,
+			 STATUS,
+			 USER_TYPE
+		 )
+		 VALUES(
+		     SEQ_USER_NO.NEXTVAL,
+		     '카카오회원',
+		     #{email},
+		     '0000',
+		     0000,
+		     'asd',
+		     'asd',
+		     SYSDATE,
+		     SYSDATE,		      	
+		     DEFAULT,
+		     DEFAULT
+		 )
+	</insert>
+	
+	<select id="kakaoLogin" resultMap="memberResultMap">
+		SELECT *
+		FROM MEMBER
+		WHERE USER_ID = #{email}
+	</select>
+	
+	<select id="selectChartDateCount" resultType="hashmap">
+		SELECT TO_CHAR(ENROLL_DATE,'YYYY/MM/DD') ENROLLDATE, COUNT(*) COUNT
+		FROM MEMBER
+		GROUP BY TO_CHAR(ENROLL_DATE,'YYYY/MM/DD')
+		ORDER BY TO_CHAR(ENROLL_DATE,'YYYY/MM/DD')
+	</select>
+
+</mapper>

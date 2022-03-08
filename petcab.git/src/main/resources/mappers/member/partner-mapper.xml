@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.petcab.work.user.model.dao.PartnerDao">
+	
+	<sql id="selectPartnerSql">
+		SELECT USER_NO,
+			   PARTNER_NAME,
+    		   PARTNER_TYPE,
+			   PHONE,
+			   OPEN_TIME,
+			   IMAGE_ORI,
+			   IMAGE_RE,
+			   ABOUT,
+			   STATUS
+		FROM PARTNER
+	</sql>
+	
+	<resultMap type="Partner" id="PartnerResultMap">
+		<id property="userNo" column="USER_NO"/>
+		<result property="partnerName" column="PARTNER_NAME"/>
+		<result property="partnerType" column="PARTNER_TYPE"/>
+		<result property="phone" column="PHONE"/>
+		<result property="openTime" column="OPEN_TIME"/>
+		<result property="imageOri" column="IMAGE_ORI"/>
+		<result property="imageRe" column="IMAGE_RE"/>
+		<result property="about" column="ABOUT"/>
+		<result property="rowNum" column="ROWNUM"/>
+		<result property="status" column="STATUS"/>
+		<result property="rowNum" column="ROWNUM"/>
+		<result property="count" column="COUNT"/>
+		<association property="member" resultMap="MemberResultMap"/>
+	</resultMap>
+	
+	<resultMap type="member" id="MemberResultMap">
+		<id property="userNo" column="USER_NO"/>
+		
+		<result property="userName" column="USER_NAME"/>
+		<result property="userId" column="USER_ID"/>
+		<result property="userPwd" column="USER_PWD"/>
+		<result property="postCode" column="POSTCODE"/>
+		<result property="address" column="ADDRESS"/>
+		<result property="phone" column="PHONE"/>
+		<result property="enrollDate" column="ENROLL_DATE"/>
+		<result property="modifyDate" column="MODIFY_DATE"/>
+		<result property="userType" column="USER_TYPE"/>
+	</resultMap>
+	
+	<insert id="insertPartner" parameterType="Partner"
+		useGeneratedKeys="true" keyProperty="userNo" keyColumn="USER_NO">
+		INSERT INTO PARTNER (
+		    USER_NO,
+		    PARTNER_NAME,
+		    PARTNER_TYPE,
+		    PHONE,
+		    OPEN_TIME,
+		    IMAGE_ORI,
+		    IMAGE_RE,
+		    ABOUT,
+		    STATUS
+		) VALUES (
+		    #{userNo},
+		    #{partnerName},
+		    #{partnerType},
+		    #{phone},
+		    #{openTime},
+		    #{imageOri},
+		    #{imageRe},
+		    #{about},
+		    DEFAULT
+		)
+	</insert>
+
+	<select id="selectPtHospital" resultMap="PartnerResultMap">
+		SELECT P.USER_NO,
+			   P.PARTNER_TYPE,
+			   P.PARTNER_NAME,
+			   P.IMAGE_ORI,
+			   P.IMAGE_RE,
+			   M.ADDRESS,
+			   P.PHONE,
+			   P.OPEN_TIME
+		FROM PARTNER P, MEMBER M
+		WHERE P.USER_NO = M.USER_NO
+		AND P.STATUS = 'Y'
+		AND P.PARTNER_TYPE = '병원'
+	</select>
+	
+	<select id="selectPtKinderGarten" resultMap="PartnerResultMap">
+		SELECT P.USER_NO,
+			   P.PARTNER_TYPE,
+			   P.PARTNER_NAME,
+			   P.IMAGE_ORI,
+			   P.IMAGE_RE,
+			   M.ADDRESS,
+			   P.PHONE,
+			   P.OPEN_TIME
+		FROM PARTNER P, MEMBER M
+		WHERE P.USER_NO = M.USER_NO
+		AND P.STATUS = 'Y'
+		AND P.PARTNER_TYPE = '유치원'
+	</select>
+	
+	<select id="selectPtShop" resultMap="PartnerResultMap">
+		SELECT P.USER_NO,
+			   P.PARTNER_TYPE,
+			   P.PARTNER_NAME,
+			   P.IMAGE_ORI,
+			   P.IMAGE_RE,
+			   M.ADDRESS,
+			   P.PHONE,
+			   P.OPEN_TIME
+		FROM PARTNER P, MEMBER M
+		WHERE P.USER_NO = M.USER_NO
+		AND P.STATUS = 'Y'
+		AND P.PARTNER_TYPE = '샵'
+	</select>
+	
+	<select id="selectPartner" resultMap="PartnerResultMap">
+		<include refid="selectPartnerSql"></include>
+		WHERE USER_NO = #{userNo}
+	</select>
+	
+	<select id="selectPartnerCount" resultType="_int">
+		SELECT COUNT(*) FROM PARTNER
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="keyword != null and keyword != ''">
+				<if test="searchType == 'partnerName'">
+					AND PARTNER_NAME LIKE '%'||#{keyword}||'%'
+				</if>
+				<if test="searchType == 'partnerType'">
+					AND PARTNER_TYPE LIKE '%'||#{keyword}||'%'
+				</if>
+			</if>
+		</trim>
+	</select>
+
+	<select id="selectAllPartners" parameterType="_int" resultMap="PartnerResultMap">
+		SELECT ROWNUM, 
+			   USER_NO,
+			   USER_ID,
+			   PARTNER_NAME,
+			   PARTNER_TYPE,
+			   PHONE,
+			   ADDRESS,
+		   	   OPEN_TIME,
+		       IMAGE_ORI,
+		       IMAGE_RE,
+		       ABOUT,
+		       STATUS
+		FROM (
+				SELECT P.USER_NO,
+					   M.USER_ID,
+					   P.PARTNER_NAME,
+					   P.PARTNER_TYPE,
+					   P.PHONE,
+					   M.ADDRESS,
+					   P.OPEN_TIME,
+					   P.IMAGE_ORI,
+					   P.IMAGE_RE,
+					   P.ABOUT,
+					   P.STATUS
+				FROM PARTNER P
+				JOIN MEMBER M ON (P.USER_NO = M.USER_NO)
+		)
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="searchType == 'partnerName' and keyword != null and keyword != ''">
+				AND PARTNER_NAME LIKE '%'||#{keyword}||'%'
+			</if>
+			<if test="searchType == 'partType' and keyword != null and keyword != ''">
+				AND PARTNER_TYPE LIKE '%'||#{keyword}||'%'
+			</if>
+		</trim>
+		ORDER BY ROWNUM
+	</select>
+	
+
+	<select id="selectWaitPartners" parameterType="_int" 
+		resultMap="PartnerResultMap">
+		SELECT ROWNUM, USER_NAME, USER_NO, PARTNER_NAME, PARTNER_TYPE, PHONE,OPEN_TIME,IMAGE_ORI,IMAGE_RE,ABOUT,STATUS,ADDRESS
+			FROM (
+			SELECT 
+			    M.USER_NAME,
+		        P.USER_NO,
+		        P.PARTNER_NAME,
+		        P.PARTNER_TYPE,
+		        P.PHONE,
+		        P.OPEN_TIME,
+		        P.IMAGE_ORI,
+		        P.IMAGE_RE,
+		        P.ABOUT,
+		        P.STATUS,
+		        M.ADDRESS
+		    FROM PARTNER P
+		    JOIN MEMBER M ON (P.USER_NO=M.USER_NO)
+		    WHERE P.STATUS = 'W'
+		)
+		ORDER BY ROWNUM
+	</select>
+	<select id="getRejectPartnerCount" resultType="_int">
+		SELECT COUNT(*) FROM PARTNER
+		WHERE STATUS='N'
+	</select>
+	<select id="selectRejectPartners" parameterType="map" resultMap="PartnerResultMap">
+		SELECT ROWNUM, USER_NAME, USER_NO, PARTNER_NAME, PARTNER_TYPE, PHONE,OPEN_TIME,IMAGE_ORI,IMAGE_RE,ABOUT,STATUS,ADDRESS
+			FROM (
+			    SELECT M.USER_NAME,
+		        P.USER_NO,
+		        P.PARTNER_NAME,
+		        P.PARTNER_TYPE,
+		        P.PHONE,
+		        P.OPEN_TIME,
+		        P.IMAGE_ORI,
+		        P.IMAGE_RE,
+		        P.ABOUT,
+		        P.STATUS,
+		        M.ADDRESS
+		    FROM PARTNER P
+		    JOIN MEMBER M ON (P.USER_NO=M.USER_NO)
+		    WHERE P.STATUS = 'N'
+		)
+		ORDER BY ROWNUM
+	</select>
+	
+	<update id="applyPartner" parameterType="Partner">
+		UPDATE PARTNER
+		SET STATUS = 'Y'
+		WHERE USER_NO = #{userNo}
+	</update>
+	
+	<update id="rejectPartner" parameterType="Partner">
+		UPDATE PARTNER
+		SET STATUS = 'N'
+		WHERE USER_NO = #{userNo}
+	</update>
+	
+	<update id="updatePartner" parameterType="Partner">
+		UPDATE PARTNER
+		SET PARTNER_NAME = #{partnerName},
+		    PARTNER_TYPE = #{partnerType},
+			PHONE = #{phone},
+		    OPEN_TIME = #{openTime},
+		    IMAGE_ORI = #{imageOri},
+		    IMAGE_RE = #{imageRe},
+		    ABOUT = #{about}
+		WHERE USER_NO = #{userNo}
+	</update>
+	
+	<select id="selectPartnerDetail" parameterType="_int" resultMap="PartnerResultMap">
+		SELECT USER_NO,
+			   PARTNER_NAME, 
+			   ABOUT
+		FROM PARTNER 
+		WHERE USER_NO = #{userNo}
+	</select>
+	
+	<select id="selectpChartList" resultMap="PartnerResultMap">
+		SELECT PARTNER_TYPE
+		FROM PARTNER
+		GROUP BY PARTNER_TYPE
+		ORDER BY PARTNER_TYPE
+	</select>
+	
+	<select id="selectpChartCount" resultMap="PartnerResultMap">
+		SELECT COUNT(PARTNER_TYPE) count
+		FROM PARTNER
+		GROUP BY PARTNER_TYPE
+		ORDER BY PARTNER_TYPE
+	</select>
+	
+	<select id="selectShop" resultMap="PartnerResultMap">
+		SELECT
+			p.USER_NO, 
+			P.PARTNER_NAME,
+			P.PARTNER_TYPE,
+			M.ADDRESS
+		FROM PARTNER P
+		JOIN MEMBER M ON (P.USER_NO=M.USER_NO)
+		WHERE P.STATUS = 'Y'
+		AND PARTNER_TYPE = '샵'
+	</select>
+	<select id="selectHospital" resultMap="PartnerResultMap">
+		SELECT 
+			p.USER_NO, 			
+			P.PARTNER_NAME,
+			P.PARTNER_TYPE,
+			M.ADDRESS
+		FROM PARTNER P
+		JOIN MEMBER M ON (P.USER_NO=M.USER_NO)
+		WHERE P.STATUS = 'Y'
+		AND PARTNER_TYPE = '병원'
+	</select>
+	<select id="selectpSchool" resultMap="PartnerResultMap">
+		SELECT
+			p.USER_NO, 		 
+			P.PARTNER_NAME,
+			P.PARTNER_TYPE,
+			M.ADDRESS
+		FROM PARTNER P
+		JOIN MEMBER M ON (P.USER_NO=M.USER_NO)
+		WHERE P.STATUS = 'Y'
+		AND PARTNER_TYPE = '유치원'
+	</select>
+	
+	
+</mapper>

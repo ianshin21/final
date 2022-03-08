@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.petcab.work.review.model.dao.ReviewDao">
+	<sql id="ReviewListSql">
+		SELECT  R.REVIEW_NO,
+				R.TITLE,
+				M.USER_ID,
+				R.STAR_NO,
+				TO_CHAR(R.POST_DATE, 'YYYY/MM/DD hh24:mm:ss')as POST_DATE,
+				R.CONTENT,
+				R.STATUS,
+				R.CALL_TYPE,
+				R.VIEW_NO,
+				R.CALL_NO,
+				R.S_USER_NO
+			FROM REVIEW R
+			JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+	</sql>
+	
+	<resultMap type="Review" id="reviewResultMap">
+		<id property="reviewNo" column="REVIEW_NO"/>
+		<result property="userNo" column="USER_NO"/>
+		<result property="userId" column="USER_ID"/>
+		<result property="callNo" column="CALL_NO"/>
+		<result property="title" column="TITLE"/>
+		<result property="content" column="CONTENT"/>
+		<result property="postDate" column="POST_DATE"/>	
+		<result property="editDate" column="EDIT_DATE"/>	
+		<result property="viewNo" column="VIEW_NO"/>
+		<result property="callType" column="CALL_TYPE"/>
+		<result property="starNo" column="STAR_NO"/>
+		<result property="groupNo" column="GROUP_NO"/>
+		<result property="groupSeq" column="GROUP_SEQ"/>
+		<result property="depth" column="DEPTH"/>
+		<result property="status" column="STATUS"/>
+		<result property="sUserNo" column="S_USER_NO"/>
+	</resultMap>
+	
+	<resultMap type="Review" id="reviewDetailResultMap">
+		<id property="reviewNo" column="REVIEW_NO"/>
+		<result property="userId" column="M_USER_ID"/>
+		<result property="title" column="TITLE"/>
+		<result property="content" column="CONTENT"/>
+		<result property="viewNo" column="VIEW_NO"/>
+		<result property="postDate" column="POST_DATE"/>
+		<result property="editDate" column="EDIT_DATE"/>
+	 	<collection property="replies" javaType="java.util.ArrayList" resultMap="reviewReplyResultMap"/>	
+	</resultMap>
+	
+  	<select id="selectCount" resultType="_int">
+		SELECT COUNT(*)
+		FROM REVIEW R
+		JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="keyword != null and keyword != ''">
+				<if test="searchType == 'userId'">
+					AND M.USER_ID LIKE '%'||#{keyword}||'%'
+				</if>
+				<if test="searchType == 'title'">
+					AND R.TITLE LIKE '%'||#{keyword}||'%'
+				</if>
+			</if>
+		</trim>
+	</select>
+	
+	<select id="selectReviewList" resultMap="reviewResultMap">
+		<include refid="ReviewListSql"></include>
+		WHERE R.STATUS = 'Y'
+		<trim prefix="AND" prefixOverrides="AND|OR">
+			<if test="keyword != null and keyword != ''">
+				<if test="searchType == 'userId'">
+					AND M.USER_ID LIKE '%'||#{keyword}||'%'
+				</if>
+				<if test="searchType == 'title'">
+					AND R.TITLE LIKE '%'||#{keyword}||'%'
+				</if>
+			</if>
+		</trim>
+		ORDER BY R.REVIEW_NO DESC
+	</select>
+	 
+	 <select id="selectReviewDetail" parameterType="_int" resultMap="reviewResultMap">
+	      <include refid="ReviewListSql"></include>
+	      WHERE R.REVIEW_NO=#{reviewNo}
+   	 </select>
+   	 
+   	 <update id="updateViewNo">
+   	 	UPDATE REVIEW SET
+   	 	VIEW_NO = VIEW_NO + 1
+   	 	WHERE REVIEW_NO = #{reviewNo}
+   	 </update>
+	 
+  	 <insert id="insertReview" parameterType="map"
+  		useGeneratedKeys="false" keyProperty="ReviewNo" keyColumn="REVIEW_NO">
+  		INSERT INTO REVIEW(
+			REVIEW_NO,
+			CALL_TYPE,
+			GROUP_NO,
+			GROUP_SEQ,
+			"DEPTH",
+			TITLE,
+			"CONTENT",
+			STAR_NO,
+			POST_DATE,
+			EDIT_DATE,
+			VIEW_NO,
+			STATUS,
+			USER_NO,
+			CALL_NO,
+			S_USER_NO)
+  		VALUES(
+  			SEQ_REVIEW_NO.NEXTVAL,
+  			#{callType},
+  			DEFAULT,
+  			DEFAULT,
+  			DEFAULT,
+  			#{title},
+  			#{content},
+  			#{starNo},
+  			DEFAULT,
+  			DEFAULT,
+  			DEFAULT,
+  			DEFAULT,
+  			#{userNo},
+  			#{callNo},
+  			#{sUserNo}
+ 			)
+  	</insert>
+
+  	<select id="searchUserNo" parameterType="_int" resultMap="reviewResultMap">
+		SELECT  R.REVIEW_NO,
+				R.TITLE,
+				M.USER_ID,
+				R.STAR_NO,
+				TO_CHAR(R.POST_DATE, 'YYYY/MM/DD hh24:mm:ss')as POST_DATE,
+				R.CONTENT,
+				R.STATUS,
+				R.VIEW_NO,
+				R.USER_NO,
+				R.S_USER_NO 
+			FROM REVIEW R
+			JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+		WHERE M.USER_NO = #{userNo}
+	</select>
+	
+	<update id="updateReview" parameterType="Review">
+		UPDATE REVIEW 
+		SET 
+			CALL_TYPE=#{callType},
+			STAR_NO=#{starNo},
+			TITLE=#{title},
+			CONTENT=#{content},
+			EDIT_DATE=SYSDATE 
+		WHERE 
+			REVIEW_NO=#{reviewNo}
+	</update>	
+	
+	<update id="delete" parameterType="int">
+		UPDATE REVIEW 
+		SET
+			STATUS = 'N'
+		WHERE REVIEW_NO=#{reviewNo}
+	</update>
+	
+	<select id="searchSUserNo" parameterType="_int" resultMap="reviewResultMap">
+		SELECT  R.REVIEW_NO,
+				R.TITLE,
+				M.USER_ID,
+				R.STAR_NO,
+				TO_CHAR(R.POST_DATE, 'YYYY/MM/DD hh24:mm:ss')as POST_DATE,
+				R.CONTENT,
+				R.STATUS,
+				R.VIEW_NO,
+				R.USER_NO,
+				R.S_USER_NO
+			FROM REVIEW R
+			JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+		WHERE R.S_USER_NO = #{sUserNo}
+	</select>
+	
+	<select id="mainReviewList" resultMap="reviewResultMap">
+		SELECT REVIEW_NO,
+				TITLE,
+				CONTENT
+		FROM REVIEW
+		ORDER BY REVIEW_NO DESC
+	</select>
+	
+	<select id="selectMyReviewUserId" resultMap="reviewResultMap">
+		SELECT  R.REVIEW_NO,
+				R.TITLE,
+				M.USER_ID,
+				R.STAR_NO,
+				TO_CHAR(R.POST_DATE, 'YYYY/MM/DD hh24:mm:ss')as POST_DATE,
+				R.CONTENT,
+				R.STATUS,
+				R.VIEW_NO,
+				R.USER_NO,
+				R.S_USER_NO
+			FROM REVIEW R
+			JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+		WHERE M.USER_ID = #{userId}
+	</select>
+	
+	<select id="selectCallNoReview" resultMap="reviewResultMap" parameterType="_int">
+		SELECT * FROM REVIEW WHERE STATUS='Y' AND CALL_NO = #{callNo}
+	</select>
+	
+	<select id="driverReviewList" resultMap="reviewResultMap">
+		SELECT  R.REVIEW_NO,
+				R.TITLE,
+				M.USER_ID,
+				R.STAR_NO,
+				TO_CHAR(R.POST_DATE, 'YYYY/MM/DD hh24:mm:ss')as POST_DATE,
+				R.CONTENT,
+				R.STATUS,
+				R.VIEW_NO,
+				R.USER_NO,
+				R.S_USER_NO
+			FROM REVIEW R
+			JOIN MEMBER M ON (R.USER_NO = M.USER_NO)
+		WHERE R.S_USER_NO = #{userNo}
+	</select>
+	
+</mapper>
+
+
+
+

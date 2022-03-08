@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.petcab.work.payment.model.dao.PaymentDao">
+	
+	<!-- 중복되는 쿼리문 작성 -->
+	<sql id="selectPaymentSql">
+		SELECT MERCHANT_UID,
+			   IMP_UID,			   
+			   NAME,
+			   BUYER_NAME			   
+			   PAID_AMOUNT,
+			   APPLY_NUM,
+			   STATUS,
+			   PAY_METHOD,
+			   PG_PROVIDER,
+			   PG_TID,
+			   PAID_AT,
+			   RECEIPT_URL,
+			   USER_NO 			
+		FROM PAYMENT
+	</sql>
+	
+	<resultMap type="Payment" id="PaymentResultMap">
+	
+		<id property="merchatUid" column="MERCHANT_UID"/>
+		
+		<result property="impUid" column="IMP_UID" />
+		<result property="name" column="NAME" />
+		<result property="buyerName" column="BUYER_NAME" />
+		<result property="paidAmount" column="PAID_AMOUNT" />
+		<result property="applyNum" column="APPLY_NUM" />
+		<result property="status" column="STATUS" />
+		<result property="payMethod" column="PAY_METHOD" />
+		<result property="pgProvider" column="PG_PROVIDER" />
+		<result property="pgTid" column="PG_TID" />
+		<result property="paidAt" column="PAID_AT" />
+		<result property="receipUrl" column="RECEIPT_URL" />
+		<result property="userNo" column="USER_NO" />
+		<result property="paymentDate" column="PAYMENT_DATE"/>
+		<result property="rowNum" column="ROWNUM"/>
+		<association property="driver" resultMap="DriverResultMap" />
+		<association property="call" resultMap="CallResultMap" />
+		<association property="dog" resultMap="DogResultMap" />
+	</resultMap>
+	
+	<resultMap type="Driver" id="DriverResultMap">
+		<id property="userNo" column="USER_NO" />
+		<result property="carNo" column="CAR_NO" />
+		<result property="carType" column="CAR_TYPE" />
+		<result property="userName" column="USER_NAME"/>
+	</resultMap>
+	
+	<resultMap type="Call" id="CallResultMap">
+		<id property="callNo" column="CALL_NO"/>
+		<result property="fromWhere" column="FROM_WHERE"/>
+		<result property="toWhere" column="TO_WHERE"/>
+		<result property="callType" column="CALL_TYPE"/>
+		<result property="status" column="STATUS"/>
+	</resultMap>
+	
+	<resultMap type="Dog" id="DogResultMap">
+		<id property="dogNo" column="DOG_NO" />
+		
+		<result property="userId" column="USER_ID" />
+	</resultMap>
+	
+
+	<select id="selectPaymentCount" resultType="_int">
+		SELECT COUNT(*) FROM PAYMENT
+	</select>
+	
+	<select id="selectPaymentById" parameterType="string" resultMap="PaymentResultMap">
+		<include refid="selectPaymentSql"></include>
+		WHERE USER_ID = #{id}
+	</select>
+	
+	<select id="selectTodayPaymentAmount" resultType="_int">
+		SELECT NVL((SUM(PAID_AMOUNT)),0)
+		FROM PAYMENT
+		WHERE TO_CHAR(PAYMENT_DATE, 'yyyymmdd') = TO_CHAR(SYSDATE, 'yyyymmdd')
+	</select>
+	
+	<insert id="insertPayInfo" parameterType="map"
+  		useGeneratedKeys="true" keyProperty="merchantUid" keyColumn="MERCHANT_UID">
+  		
+  		INSERT INTO PAYMENT 
+  		VALUES(  			
+  			#{merchantUid},
+  			#{impUid},
+  			#{name},
+  			#{buyerName},
+  			#{paidAmount},
+  			#{applyNum},
+  			#{status},
+  			#{payMethod},
+  			#{pgProvider},			
+  			#{pgTid},  			
+  			#{paidAt},
+  			#{receiptUrl},				
+  			#{userNo},
+  			SYSDATE
+ 		)
+  	</insert>
+  	
+	<!-- 결제취소 paid(결제완료), cancelled(결제취소, 부분취소포함) -->
+	<update id="updatPay" parameterType="String">
+		UPDATE PAYMENT
+		SET
+		STATUS='cancelled'
+		WHERE IMP_UID=#{impUid}
+	</update>
+	
+  	<select id="searchPayCount" resultType="_int">
+		SELECT COUNT(*)
+		FROM (
+				SELECT DISTINCT G.CALL_NO,
+				    G.CALL_TYPE,
+				    P.PAYMENT_DATE,
+				    P.PAID_AMOUNT,
+				    M.USER_NAME,
+				    G.FROM_WHERE,
+				    G.TO_WHERE,
+                    G.STATUS,
+				    U.USER_ID,
+				    D.CAR_NO
+				FROM PAYMENT P JOIN GEN_CALL G ON P.MERCHANT_UID = G.MERCHANT_UID
+                JOIN CALL_DOG CD ON G.CALL_NO = CD.CALL_NO
+                JOIN DOG D2 ON CD.DOG_NO = D2.DOG_NO
+                JOIN MEMBER U ON D2.USER_ID = U.USER_ID
+                LEFT OUTER JOIN DRIVER D ON G.USER_NO = D.USER_NO
+                LEFT OUTER JOIN MEMBER M ON D.USER_NO = M.USER_NO
+		        <trim prefix="AND" prefixOverrides="AND">
+				<if test="keyword != null and keyword != ''">
+					<if test="searchType2 == 'genCallType'">
+							G.CALL_TYPE = '일반'
+						<if test="searchType == 'user'">
+							AND M.USER_ID LIKE '%'||#{keyword}||'%'
+						</if>
+						<if test="searchType == 'paymentDate'">
+							AND P.PAYMENT_DATE LIKE '%'||#{keyword}||'%'
+						</if>					
+					</if>
+					<if test="searchType2 == 'emgCallType'">
+							AND G.CALL_TYPE = '긴급'
+						<if test="searchType == 'user'">
+							AND M.USER_ID LIKE '%'||#{keyword}||'%'
+						</if>
+						<if test="searchType == 'paymentDate'">
+							P.PAYMENT_DATE LIKE '%'||#{keyword}||'%'
+						</if>					
+					</if>
+				</if>
+				</trim>
+		        ORDER BY PAYMENT_DATE
+		     )
+		ORDER BY ROWNUM
+  	</select>
+  	
+  	<select id="searchPayList" resultMap="PaymentResultMap">
+  		SELECT ROWNUM,
+		       PAYMENT_DATE,
+		       CALL_TYPE,
+		       USER_ID,
+		       USER_NAME,
+		       CAR_NO,
+		       FROM_WHERE,
+		       TO_WHERE,
+		       STATUS,
+		       PAID_AMOUNT
+		FROM (
+			SELECT DISTINCT G.CALL_NO,
+				    G.CALL_TYPE,
+				    P.PAYMENT_DATE,
+				    P.PAID_AMOUNT,
+				    M.USER_NAME,
+				    G.FROM_WHERE,
+				    G.TO_WHERE,
+                    G.STATUS,
+				    U.USER_ID,
+				    D.CAR_NO
+				FROM PAYMENT P JOIN GEN_CALL G ON P.MERCHANT_UID = G.MERCHANT_UID
+                JOIN CALL_DOG CD ON G.CALL_NO = CD.CALL_NO
+                JOIN DOG D2 ON CD.DOG_NO = D2.DOG_NO
+                JOIN MEMBER U ON D2.USER_ID = U.USER_ID
+                LEFT OUTER JOIN DRIVER D ON G.USER_NO = D.USER_NO
+                LEFT OUTER JOIN MEMBER M ON D.USER_NO = M.USER_NO
+		        ORDER BY P.PAYMENT_DATE
+		     )
+		<trim prefix="WHERE" prefixOverrides="AND|OR">
+			<if test="searchType2 == 'genCallType'">
+				AND CALL_TYPE = '일반'
+				
+					<if test="searchType == 'user' and keyword != null and keyword != ''">
+						AND USER_ID LIKE '%'||#{keyword}||'%'
+					</if>
+					<if test="searchType == 'paymentDate' and keyword != null and keyword != ''">
+						AND PAYMENT_DATE LIKE '%'||#{keyword}||'%'
+					</if>
+			
+			</if>
+			<if test="searchType2 == 'emgCallType'">
+				AND CALL_TYPE = '긴급'
+		
+					<if test="searchType == 'user' and keyword != null and keyword != ''">
+						AND USER_ID LIKE '%'||#{keyword}||'%'
+					</if>
+					<if test="searchType == 'paymentDate' and keyword != null and keyword != ''">
+						AND PAYMENT_DATE LIKE '%'||#{keyword}||'%'
+					</if>
+				
+			</if>
+		</trim>
+		ORDER BY ROWNUM
+  	</select>
+  	
+	<select id="selectByCallType" resultType="hashmap">
+		SELECT ROWNUM,
+			   TO_CHAR(PAYMENT_DATE, 'YYYY/MM/DD')PAYMENT_DATE,
+		       CALL_TYPE,
+		       USER_ID,
+		       USER_NAME,
+		       CAR_NO,
+		       FROM_WHERE,
+		       TO_WHERE,
+		       PAID_AMOUNT,
+		       PAY_METHOD 
+		FROM (
+		        SELECT DISTINCT
+		               P.PAYMENT_DATE,
+		               G.CALL_TYPE,
+		               M.USER_ID,
+		               M2.USER_NAME,
+		               D.CAR_NO,
+		               G.FROM_WHERE,
+		               G.TO_WHERE,
+		               P.PAID_AMOUNT,
+		               P.PAY_METHOD
+		        FROM PAYMENT P, GEN_CALL G, MEMBER M, MEMBER M2, DRIVER D, CALL_DOG CD, DOG D2
+		        WHERE P.USER_NO = M.USER_NO
+		        AND G.CALL_NO = CD.CALL_NO
+		        AND D2.USER_ID = M.USER_ID
+		        AND M2.USER_NO = D.USER_NO
+		        AND P.MERCHANT_UID = G.MERCHANT_UID
+		        AND P.STATUS = 'Y'
+		        ORDER BY PAYMENT_DATE
+		     )
+		WHERE CALL_TYPE = #{btnValue}
+		ORDER BY ROWNUM
+	</select>
+	
+	<!-- 가결제 시 예약 상태 변경 -->
+	<update id="updatePaid" parameterType="Call">
+		UPDATE GEN_CALL
+		SET
+		STATUS='결제'
+		WHERE CALL_NO=#{callNo}
+	</update>
+</mapper>
